@@ -8,7 +8,7 @@ export const metadata = {
   description: "Минималистичная социальная сеть",
 };
 
-export default function RootLayout({
+export default function RootLayout({ 
   children,
 }: {
   children: React.ReactNode;
