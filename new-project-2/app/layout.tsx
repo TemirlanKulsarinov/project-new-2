@@ -8,13 +8,28 @@ export const metadata = {
   description: "Минималистичная социальная сеть",
 };
 
+// Ставит тёмную тему до первой отрисовки, чтобы страница не мигала белым
+const themeScript = `
+(function () {
+  try {
+    var t = localStorage.getItem('secretspace-theme');
+    if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    }
+  } catch (e) {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ru">
+    <html lang="ru" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body>
         <AppProvider>
           <Header />

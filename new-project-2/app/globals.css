@@ -4,10 +4,12 @@
 
 :root {
   --bg-color: #f3f4f6;
+  color-scheme: light;
 }
 
 :root.dark {
   --bg-color: #0a0a0a;
+  color-scheme: dark;
 }
 
 body {
@@ -16,12 +18,14 @@ body {
   overflow-x: hidden;
 }
 
-select.minimal-select {
-  appearance: none;
-  background-image: none;
+/* --- ЛАЙК В СТИЛЕ ИНСТАГРАМ --- */
+/* Постоянное состояние «лайк поставлен» */
+.liked svg {
+  fill: #ff3040;
+  color: #ff3040;
 }
 
-/* --- ИНСТАГРАМ ЛАЙК --- */
+/* Анимация запускается только в момент клика */
 @keyframes insta-pop {
   0% { transform: scale(1); }
   25% { transform: scale(1.3); }
@@ -30,10 +34,8 @@ select.minimal-select {
   100% { transform: scale(1); }
 }
 
-.insta-liked svg {
+.pop svg {
   animation: insta-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-  fill: #ff3040;
-  color: #ff3040;
 }
 
 /* --- МАГИЧЕСКОЕ РАСКРЫТИЕ --- */
@@ -42,6 +44,27 @@ select.minimal-select {
   20% { box-shadow: inset 0 0 30px rgba(168, 85, 247, 0.2); }
   100% { box-shadow: inset 0 0 0 rgba(168, 85, 247, 0); }
 }
+
 .animate-reveal {
   animation: reveal-glow 1.5s ease-out;
+}
+
+/* --- МЕНЮ АККАУНТОВ --- */
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.account-menu {
+  transform-origin: top right;
+  animation: menu-in 0.15s ease-out;
+}
+
+/* Если у человека включено «уменьшить движение», отключаем анимации */
+@media (prefers-reduced-motion: reduce) {
+  .pop svg,
+  .animate-reveal,
+  .account-menu {
+    animation: none;
+  }
 }
