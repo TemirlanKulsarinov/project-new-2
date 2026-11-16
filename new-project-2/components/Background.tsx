@@ -58,7 +58,7 @@ function Background() {
     const measure = () => {
       periods.current = RIBBONS.map((_, i) => {
         const el = textRefs.current[i];
-        return el ? el.getComputedTextLength() / REPEATS : 0;
+        return el && typeof el.getComputedTextLength === "function" ? el.getComputedTextLength() / REPEATS : 0;
       });
     };
 
