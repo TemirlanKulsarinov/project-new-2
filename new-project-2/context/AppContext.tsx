@@ -8,6 +8,8 @@ import React, {
   useRef,
   ReactNode,
 } from "react";
+import { clearMediaFiles, deleteMediaFiles } from "@/lib/mediaStore";
+import type { PostMedia } from "@/lib/mediaStore";
 
 /* ------------------------------ Типы ------------------------------ */
 
@@ -48,6 +50,8 @@ export interface Post {
   createdAt: number;
   comments: Comment[];
   reports: Report[];
+  media: PostMedia[];
+  repostedBy: number[];
 }
 
 export type NotificationType = "reveal" | "comment" | "report";
@@ -61,6 +65,21 @@ export interface AppNotification {
   fromUserId?: number;
   createdAt: number;
   read: boolean;
+}
+
+export interface ChatMessage {
+  id: number;
+  fromUserId: number;
+  toUserId: number;
+  text: string;
+  createdAt: number;
+}
+
+export interface AccountReport {
+  reporterId: number;
+  targetUserId: number;
+  reason: string;
+  createdAt: number;
 }
 
 export interface ToastItem {
@@ -145,7 +164,10 @@ const post = (
   minsAgo: number,
   comments: Comment[] = [],
   reports: Report[] = []
-): Post => ({ id, userId, title, body, likes, likedBy: [], isAnonymous, revealLikes, createdAt: NOW - minsAgo * MIN, comments, reports });
+): Post => ({
+  id, userId, title, body, likes, likedBy: [], isAnonymous, revealLikes,
+  createdAt: NOW - minsAgo * MIN, comments, reports, media: [], repostedBy: [],
+});
 
 const INITIAL_POSTS: Post[] = [
   post(118, 4, "Про дедлайны", "Сдавать работу за час до дедлайна, это не прокрастинация, а управление ожиданиями заказчика.", 2, true, 6, 12),
@@ -189,7 +211,63 @@ const INITIAL_POSTS: Post[] = [
   ]),
   post(102, 3, "Секрет дизайнера", "Я спрятал пасхалку в макете. Попробуйте найти, когда этот пост наберет лайки.", 12, true, 15, 7500),
   post(101, 1, "Тёмная тема", "Теперь всё работает в дарк моде. И инста-лайки тоже здесь!", 6, false, 5, 9000),
+  post(100, 8, "Тихий час", "Выключила уведомления на вечер и впервые за неделю дочитала книгу до конца.", 2, true, 6, 25),
+  post(99, 4, "Маленькая мастерская", "Сегодня собрали первую версию сайта для локального бренда. Пока просто, зато всё настоящее.", 16, false, 5, 47, [
+    cm(3001, 10, "Покажешь, когда запустите?", 30),
+    cm(3002, 3, "Очень люблю такие проекты.", 22),
+  ]),
+  post(98, 7, "Звук дождя", "Записал дождь по дороге домой и уже час пытаюсь превратить его в нормальный сэмпл.", 4, true, 10, 75),
+  post(97, 5, "Без фильтров", "Вчерашняя прогулка без камеры напомнила, почему я вообще начал фотографировать.", 38, false, 5, 110, [
+    cm(3003, 4, "Иногда лучший кадр остаётся в памяти.", 80),
+  ]),
+  post(96, 6, "Странная ошибка", "Модель идеально работала на моём ноутбуке, пока я не проверил её на других данных.", 3, true, 8, 145),
+  post(95, 10, "Билет в один конец", "Купила билет в Алматы на выходные. План пока состоит из кофе, прогулки и никаких планов.", 54, false, 5, 185, [
+    cm(3004, 5, "Загляни на Кок-Тобе, если будет время.", 140),
+    cm(3005, 2, "Лучший способ провести выходные.", 125),
+  ]),
+  post(94, 9, "Первый провал", "Презентация не прошла, зато после неё я наконец понял, кому наш продукт действительно нужен.", 7, true, 12, 230),
+  post(93, 3, "Пиксель за пикселем", "Перерисовал старый экран приложения. Удивительно, сколько проблем решает нормальный отступ.", 19, false, 5, 280, [
+    cm(3006, 8, "Отступы — тихие герои интерфейса.", 250),
+  ]),
+  post(92, 1, "Неловкий созвон", "Начал демонстрацию экрана и первые две минуты показывал не тот монитор. Зато все познакомились с моими вкладками.", 1, true, 6, 340),
+  post(91, 2, "Короткая прогулка", "Вышел пройтись между встречами, вернулся с новой идеей и без ощущения, что весь день просидел за столом.", 64, false, 5, 410, [
+    cm(3007, 6, "Лучший способ перезагрузить голову.", 360),
+    cm(3008, 9, "Надо тоже поставить прогулки в календарь.", 320),
+  ]),
+  post(90, 8, "Проверка на понятность", "Попросила друга впервые открыть прототип. Он нажал на декоративную иллюстрацию и спросил, почему она не кликается.", 4, true, 9, 490),
+  post(89, 7, "Репетиция", "Сегодня сыграли новый трек вживую впервые. Один переход развалился, но зал всё равно подпевал.", 29, false, 5, 580),
+  post(88, 10, "Список мест", "Составила список мест в городе, куда всё собираюсь сходить. В списке уже 27 пунктов и ни одного свободного дня.", 5, true, 14, 690),
+  post(87, 5, "После заката", "На набережной сегодня было почти пусто. Получились самые спокойные кадры за весь месяц.", 47, false, 5, 810, [
+    cm(3009, 10, "Там особенно красиво после дождя.", 740),
+  ]),
+  post(86, 2, "Совет, который сработал", "Перестал начинать день с почты и наконец закончил задачу, которая лежала в списке две недели.", 2, true, 7, 950),
+  post(85, 4, "Чайная пауза", "Вместо ещё одного созвона собрали команду на чай. За двадцать минут решили больше, чем за час переписки.", 33, false, 5, 1120),
+  post(84, 6, "Цена красивой метрики", "Убрала одну метрику из отчёта, и обсуждение стало вдвое полезнее. Не всё, что можно измерить, важно.", 9, true, 15, 1320, [
+    cm(3010, 1, "Сильная мысль, особенно для продуктовых команд.", 1200),
+  ]),
+  post(83, 9, "План на месяц", "На этот раз в план попали не только дедлайны, но и выходные. Посмотрим, получится ли не передвинуть их.", 72, false, 5, 1560),
+  post(82, 3, "Критика макета", "Попросил честный отзыв и получил ровно его. Немного неприятно, зато теперь понятно, что делать дальше.", 3, true, 8, 1840),
+  post(81, 1, "Три часа на одну кнопку", "Три часа спорили о тексте на кнопке. Победил вариант, который был в первом черновике.", 21, false, 5, 2200, [
+    cm(3011, 8, "Главное, что нашли правильный путь обратно.", 2100),
+    cm(3012, 7, "Знакомая история.", 2050),
+  ]),
+  post(80, 10, "Не тот поезд", "Села не на тот поезд, зато нашла маленькую кофейню, которую теперь буду советовать всем.", 8, true, 12, 2700),
+  post(79, 5, "Туманное утро", "Вышел на съёмку затемно, а город встретил таким туманом, что пришлось менять весь план.", 58, false, 5, 3300),
+  post(78, 6, "Починил не то", "Потратил вечер на оптимизацию медленной функции. Оказалось, тормозил один лишний запрос к базе.", 1, true, 6, 4100),
+  post(77, 7, "Новая демка", "Записал короткую демку на телефон. Качество ужасное, но в ней есть то настроение, которое я искал.", 41, false, 5, 5200, [
+    cm(3013, 3, "Сырая демка часто честнее финальной версии.", 5000),
+  ]),
+  post(76, 8, "Один вопрос на интервью", "Спросили не про самый сильный кейс, а про решение, которое я бы сейчас переделала. Ответ оказался проще.", 4, true, 11, 6800),
+  post(75, 4, "Город просыпается", "Утром прошлась пешком до работы вместо такси. У города совсем другой ритм, когда не смотришь на него из окна.", 83, false, 5, 9100),
+  post(74, 2, "Команда и доверие", "Самая быстрая задача за месяц — та, где все заранее договорились, кто за что отвечает.", 7, true, 15, 12500),
+  post(73, 9, "Письмо себе", "Нашёл заметку годичной давности с планом на этот проект. Почти ничего не совпало, но почему-то это хорошая новость.", 36, false, 5, 18000),
+  post(72, 10, "Потерянный маршрут", "Убрала карту в карман и пошла куда глаза глядят. Нашла парк, про который не знала, хотя живу здесь несколько лет.", 2, true, 9, 25500),
+  post(71, 3, "Старый скетчбук", "Перелистывал старые наброски и нашёл идею, которую тогда счёл слишком простой. Кажется, пора к ней вернуться.", 97, false, 5, 36000, [
+    cm(3014, 4, "Иногда старые идеи просто ждут своего времени.", 34000),
+  ]),
 ];
+
+const SAMPLE_POSTS_VERSION = 1;
 
 /* ------------------------------ Контекст ------------------------------ */
 
@@ -201,6 +279,12 @@ interface AppContextType {
   isModerator: boolean;
   theme: "light" | "dark";
   savedIds: number[]; // сохранённые посты текущего пользователя (новые первыми)
+  followingIds: number[];
+  followerCounts: Record<number, number>;
+  blockedUserIds: number[];
+  blockedByUserIds: number[];
+  messages: ChatMessage[];
+  accountReports: AccountReport[];
   notifications: AppNotification[]; // только для текущего пользователя
   unreadCount: number;
   toasts: ToastItem[];
@@ -208,10 +292,17 @@ interface AppContextType {
   toggleTheme: () => void;
   registerUser: (data: RegisterData) => RegisterResult;
   updateUser: (id: number, firstName: string, lastName: string, bio: string) => void;
-  addPost: (title: string, body: string, revealLikes: number) => number;
+  addPost: (title: string, body: string, revealLikes: number, media?: PostMedia[]) => number;
   deletePost: (id: number) => void;
   toggleLike: (postId: number) => void;
+  toggleRepost: (postId: number) => void;
   toggleBookmark: (postId: number) => void;
+  toggleFollow: (userId: number) => void;
+  blockUser: (userId: number) => void;
+  unblockUser: (userId: number) => void;
+  reportUser: (userId: number, reason: string) => void;
+  dismissAccountReports: (userId: number) => void;
+  sendMessage: (userId: number, text: string) => boolean;
   addComment: (postId: number, text: string) => void;
   deleteComment: (postId: number, commentId: number) => void;
   reportPost: (postId: number, reason: string) => void;
@@ -220,7 +311,7 @@ interface AppContextType {
   dismissCommentReports: (postId: number, commentId: number) => void;
   markNotificationsRead: (id?: number) => void;
   pushToast: (text: string) => void;
-  resetData: () => void;
+  resetData: () => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextType>({} as AppContextType);
@@ -234,11 +325,16 @@ export const DRAFT_KEY = "secretspace-draft";
 export const INTRO_KEY = "secretspace-intro";
 
 interface SavedState {
+  samplePostsVersion?: number;
   posts?: Partial<Post>[];
   users?: Record<string, Partial<User>>;
   currentUserId?: number;
   notifications?: AppNotification[];
   bookmarks?: Record<string, number[]>;
+  following?: Record<string, number[]>;
+  blockedUsers?: Record<string, number[]>;
+  messages?: ChatMessage[];
+  accountReports?: AccountReport[];
 }
 
 // Жалобы в старом формате были просто списком id
@@ -262,6 +358,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUserId, setCurrentUserId] = useState<number>(1);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [bookmarks, setBookmarks] = useState<Record<number, number[]>>({});
+  const [following, setFollowing] = useState<Record<number, number[]>>({});
+  const [blockedUsers, setBlockedUsers] = useState<Record<number, number[]>>({});
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [accountReports, setAccountReports] = useState<AccountReport[]>([]);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [ready, setReady] = useState(false);
@@ -328,8 +428,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
                       .map((c) => ({ ...c, reports: normalizeReports((c as Partial<Comment>).reports) }))
                   : [],
                 reports: normalizeReports(p.reports),
+                media: Array.isArray(p.media)
+                  ? p.media.filter((item): item is PostMedia =>
+                      !!item &&
+                      typeof item.id === "string" &&
+                      typeof item.name === "string" &&
+                      typeof item.mimeType === "string" &&
+                      typeof item.size === "number" &&
+                      (item.kind === "image" || item.kind === "video" || item.kind === "audio")
+                    )
+                  : [],
+                repostedBy: Array.isArray(p.repostedBy)
+                  ? p.repostedBy.filter((id): id is number => typeof id === "number" && !!merged[id])
+                  : [],
               })
             );
+          if ((saved.samplePostsVersion ?? 0) < SAMPLE_POSTS_VERSION) {
+            const restoredIds = new Set(restored.map((p) => p.id));
+            restored.push(...INITIAL_POSTS.filter((p) => p.id <= 100 && !restoredIds.has(p.id)));
+          }
           setPosts(restored);
         }
         if (typeof saved.currentUserId === "number" && merged[saved.currentUserId]) {
@@ -342,6 +459,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
             if (Array.isArray(list)) b[Number(key)] = list.filter((x): x is number => typeof x === "number");
           }
           setBookmarks(b);
+        }
+        if (saved.following && typeof saved.following === "object") {
+          const restored: Record<number, number[]> = {};
+          for (const [key, list] of Object.entries(saved.following)) {
+            const userId = Number(key);
+            if (!merged[userId] || !Array.isArray(list)) continue;
+            restored[userId] = [...new Set(
+              list.filter((id): id is number => typeof id === "number" && id !== userId && !!merged[id])
+            )];
+          }
+          setFollowing(restored);
+        }
+        if (saved.blockedUsers && typeof saved.blockedUsers === "object") {
+          const restored: Record<number, number[]> = {};
+          for (const [key, list] of Object.entries(saved.blockedUsers)) {
+            const userId = Number(key);
+            if (!merged[userId] || !Array.isArray(list)) continue;
+            restored[userId] = [...new Set(
+              list.filter((id): id is number => typeof id === "number" && id !== userId && !!merged[id])
+            )];
+          }
+          setBlockedUsers(restored);
+        }
+        if (Array.isArray(saved.messages)) {
+          setMessages(
+            saved.messages
+              .filter((message): message is ChatMessage =>
+                !!message &&
+                typeof message.id === "number" &&
+                typeof message.fromUserId === "number" &&
+                typeof message.toUserId === "number" &&
+                message.fromUserId !== message.toUserId &&
+                !!merged[message.fromUserId] &&
+                !!merged[message.toUserId] &&
+                typeof message.text === "string" &&
+                typeof message.createdAt === "number"
+              )
+              .map((message) => ({ ...message, text: message.text.trim().slice(0, 1000) }))
+              .filter((message) => message.text.length > 0)
+          );
+        }
+        if (Array.isArray(saved.accountReports)) {
+          setAccountReports(
+            saved.accountReports.filter((report) =>
+              !!report &&
+              typeof report.reporterId === "number" &&
+              typeof report.targetUserId === "number" &&
+              report.reporterId !== report.targetUserId &&
+              !!merged[report.reporterId] &&
+              !!merged[report.targetUserId] &&
+              typeof report.reason === "string" &&
+              typeof report.createdAt === "number"
+            )
+          );
         }
       }
 
@@ -360,12 +531,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ posts, users, currentUserId, notifications, bookmarks })
+        JSON.stringify({
+          samplePostsVersion: SAMPLE_POSTS_VERSION,
+          posts,
+          users,
+          currentUserId,
+          notifications,
+          bookmarks,
+          following,
+          blockedUsers,
+          messages,
+          accountReports,
+        })
       );
     } catch {
       // хранилище переполнено или недоступно
     }
-  }, [posts, users, currentUserId, notifications, bookmarks, ready]);
+  }, [posts, users, currentUserId, notifications, bookmarks, following, blockedUsers, messages, accountReports, ready]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -450,7 +632,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   /* ---------- Посты (после публикации не редактируются, только удаляются) ---------- */
   const addPost = useCallback(
-    (title: string, body: string, revealLikes: number) => {
+    (title: string, body: string, revealLikes: number, media: PostMedia[] = []) => {
       const id = nextId();
       const newPost: Post = {
         id,
@@ -464,6 +646,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         createdAt: Date.now(),
         comments: [],
         reports: [],
+        media,
+        repostedBy: [],
       };
       setPosts((prev) => [newPost, ...prev]);
       pushToast(`Пост опубликован анонимно. Автор раскроется после ${revealLikes} лайков`);
@@ -475,7 +659,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Удалить пост может его автор или модератор
   const deletePost = useCallback(
     (id: number) => {
+      const target = postsRef.current.find((post) => post.id === id);
+      if (!target || !(target.userId === currentUserId || isModerator)) return;
       setPosts((prev) => prev.filter((p) => p.id !== id || !(p.userId === currentUserId || isModerator)));
+      void deleteMediaFiles(target.media).catch(() => {
+        pushToast("Пост удалён, но не удалось очистить его медиафайлы");
+      });
       pushToast("Пост удалён");
     },
     [currentUserId, isModerator, pushToast]
@@ -511,6 +700,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [currentUserId, addNotification, pushToast]
   );
 
+  const toggleRepost = useCallback(
+    (postId: number) => {
+      const target = postsRef.current.find((post) => post.id === postId);
+      if (!target) return;
+      const reposted = target.repostedBy.includes(currentUserId);
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                repostedBy: reposted
+                  ? post.repostedBy.filter((userId) => userId !== currentUserId)
+                  : [currentUserId, ...post.repostedBy],
+              }
+            : post
+        )
+      );
+      pushToast(reposted ? "Репост отменён" : "Пост добавлен в ваши репосты");
+    },
+    [currentUserId, pushToast]
+  );
+
   /* ---------- Сохранённое (у каждого пользователя свой список) ---------- */
   const toggleBookmark = useCallback(
     (postId: number) => {
@@ -528,6 +739,111 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const savedIds = useMemo(
     () => (bookmarks[currentUserId] ?? []).filter((id) => posts.some((p) => p.id === id)),
     [bookmarks, currentUserId, posts]
+  );
+
+  /* ---------- Подписки ---------- */
+  const followingIds = useMemo(() => following[currentUserId] ?? [], [following, currentUserId]);
+  const followerCounts = useMemo(() => {
+    const counts: Record<number, number> = {};
+    Object.values(following).forEach((ids) => {
+      ids.forEach((id) => {
+        counts[id] = (counts[id] ?? 0) + 1;
+      });
+    });
+    return counts;
+  }, [following]);
+  const blockedUserIds = useMemo(() => blockedUsers[currentUserId] ?? [], [blockedUsers, currentUserId]);
+  const blockedByUserIds = useMemo(
+    () => Object.entries(blockedUsers)
+      .filter(([id, ids]) => Number(id) !== currentUserId && ids.includes(currentUserId))
+      .map(([id]) => Number(id)),
+    [blockedUsers, currentUserId]
+  );
+
+  const toggleFollow = useCallback(
+    (userId: number) => {
+      if (userId === currentUserId || !users[userId] || blockedUserIds.includes(userId) || blockedByUserIds.includes(userId)) return;
+      const alreadyFollowing = (following[currentUserId] ?? []).includes(userId);
+      setFollowing((prev) => {
+        const mine = prev[currentUserId] ?? [];
+        return {
+          ...prev,
+          [currentUserId]: alreadyFollowing ? mine.filter((id) => id !== userId) : [userId, ...mine],
+        };
+      });
+      pushToast(alreadyFollowing ? "Вы отписались" : `Вы подписались на @${users[userId].username}`);
+    },
+    [blockedByUserIds, blockedUserIds, currentUserId, following, pushToast, users]
+  );
+
+  const blockUser = useCallback(
+    (userId: number) => {
+      if (userId === currentUserId || !users[userId]) return;
+      setBlockedUsers((prev) => {
+        const mine = prev[currentUserId] ?? [];
+        return mine.includes(userId) ? prev : { ...prev, [currentUserId]: [userId, ...mine] };
+      });
+      setFollowing((prev) => ({
+        ...prev,
+        [currentUserId]: (prev[currentUserId] ?? []).filter((id) => id !== userId),
+      }));
+      pushToast(`@${users[userId].username} заблокирован`);
+    },
+    [currentUserId, pushToast, users]
+  );
+
+  const unblockUser = useCallback(
+    (userId: number) => {
+      setBlockedUsers((prev) => ({
+        ...prev,
+        [currentUserId]: (prev[currentUserId] ?? []).filter((id) => id !== userId),
+      }));
+      pushToast("Пользователь разблокирован");
+    },
+    [currentUserId, pushToast]
+  );
+
+  const reportUser = useCallback(
+    (userId: number, reason: string) => {
+      if (
+        userId === currentUserId ||
+        !users[userId] ||
+        !reason ||
+        accountReports.some((report) => report.reporterId === currentUserId && report.targetUserId === userId)
+      ) return;
+      setAccountReports((prev) => [
+        ...prev,
+        { reporterId: currentUserId, targetUserId: userId, reason, createdAt: Date.now() },
+      ]);
+      pushToast("Жалоба на профиль отправлена модератору");
+    },
+    [accountReports, currentUserId, pushToast, users]
+  );
+
+  const dismissAccountReports = useCallback(
+    (userId: number) => {
+      if (!isModerator) return;
+      setAccountReports((prev) => prev.filter((report) => report.targetUserId !== userId));
+      pushToast("Жалобы на профиль рассмотрены");
+    },
+    [isModerator, pushToast]
+  );
+
+  const sendMessage = useCallback(
+    (userId: number, text: string) => {
+      const clean = text.trim().slice(0, 1000);
+      if (userId === currentUserId || !users[userId] || !clean) return false;
+      if (blockedUserIds.includes(userId) || blockedByUserIds.includes(userId)) {
+        pushToast("Нельзя отправить сообщение: один из пользователей заблокирован");
+        return false;
+      }
+      setMessages((prev) => [
+        ...prev,
+        { id: nextId(), fromUserId: currentUserId, toUserId: userId, text: clean, createdAt: Date.now() },
+      ]);
+      return true;
+    },
+    [blockedByUserIds, blockedUserIds, currentUserId, pushToast, users]
   );
 
   /* ---------- Комментарии ---------- */
@@ -629,27 +945,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   /* ---------- Сброс демо-данных ---------- */
-  const resetData = useCallback(() => {
+  const resetData = useCallback(async () => {
     try {
+      await clearMediaFiles();
       [STORAGE_KEY, OLD_STORAGE_KEY, FEED_PREFS_KEY, DRAFT_KEY, INTRO_KEY].forEach((k) => localStorage.removeItem(k));
-    } catch {}
+    } catch {
+      pushToast("Не удалось сбросить данные и медиафайлы");
+      return;
+    }
     window.location.assign("/");
-  }, []);
+  }, [pushToast]);
 
   const value = useMemo<AppContextType>(
     () => ({
-      ready, posts, users, currentUser, isModerator, theme, savedIds,
+      ready, posts, users, currentUser, isModerator, theme, savedIds, followingIds, followerCounts,
+      blockedUserIds, blockedByUserIds, messages, accountReports,
       notifications: myNotifications, unreadCount, toasts,
       switchAccount, toggleTheme, registerUser, updateUser,
-      addPost, deletePost, toggleLike, toggleBookmark, addComment, deleteComment,
+      addPost, deletePost, toggleLike, toggleRepost, toggleBookmark, toggleFollow,
+      blockUser, unblockUser, reportUser, dismissAccountReports, sendMessage,
+      addComment, deleteComment,
       reportPost, reportComment, dismissReports, dismissCommentReports,
       markNotificationsRead, pushToast, resetData,
     }),
     [
-      ready, posts, users, currentUser, isModerator, theme, savedIds,
+      ready, posts, users, currentUser, isModerator, theme, savedIds, followingIds, followerCounts,
+      blockedUserIds, blockedByUserIds, messages, accountReports,
       myNotifications, unreadCount, toasts,
       switchAccount, toggleTheme, registerUser, updateUser,
-      addPost, deletePost, toggleLike, toggleBookmark, addComment, deleteComment,
+      addPost, deletePost, toggleLike, toggleRepost, toggleBookmark, toggleFollow,
+      blockUser, unblockUser, reportUser, dismissAccountReports, sendMessage,
+      addComment, deleteComment,
       reportPost, reportComment, dismissReports, dismissCommentReports,
       markNotificationsRead, pushToast, resetData,
     ]

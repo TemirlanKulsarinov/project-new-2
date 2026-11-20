@@ -14,7 +14,7 @@ const iconBtn =
 
 export default function Header() {
   const {
-    ready, users, posts, currentUser, isModerator, switchAccount, theme, toggleTheme, resetData,
+    ready, users, posts, accountReports, currentUser, isModerator, switchAccount, theme, toggleTheme, resetData,
   } = useContext(AppContext);
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -25,7 +25,8 @@ export default function Header() {
   const accounts = Object.values(users);
   const pendingReports =
     posts.filter((p) => p.reports.length > 0).length +
-    posts.reduce((sum, p) => sum + p.comments.filter((c) => c.reports.length > 0).length, 0);
+    posts.reduce((sum, p) => sum + p.comments.filter((c) => c.reports.length > 0).length, 0) +
+    accountReports.length;
 
   // Клик по логотипу полностью перезагружает страницу: лента обновляется, фильтры сбрасываются
   const onLogoClick = (e: React.MouseEvent) => {
@@ -107,6 +108,30 @@ export default function Header() {
                 </svg>
               </Link>
               <Link
+                href="/explore"
+                aria-label="Обзор"
+                title="Обзор"
+                className={`${iconBtn} ${pathname === "/explore" ? "text-purple-600 dark:text-purple-400" : ""}`}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m20 20-4-4" />
+                  <path d="M11 8v6M8 11h6" />
+                </svg>
+              </Link>
+              <Link
+                href="/following"
+                aria-label="Подписки"
+                title="Подписки"
+                className={`${iconBtn} ${pathname === "/following" ? "text-purple-600 dark:text-purple-400" : ""}`}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M20 8v6M23 11h-6" />
+                </svg>
+              </Link>
+              <Link
                 href="/saved"
                 aria-label="Сохранённое"
                 title="Сохранённое"
@@ -158,6 +183,9 @@ export default function Header() {
 
                     {[
                       { href: `/u/${currentUser.username}`, label: "Мой профиль" },
+                      { href: "/explore", label: "Обзор и поиск" },
+                      { href: "/messages", label: "Сообщения" },
+                      { href: "/following", label: "Подписки" },
                       { href: "/saved", label: "Сохранённое" },
                       { href: "/settings", label: "Настройки профиля" },
                     ].map((item) => (

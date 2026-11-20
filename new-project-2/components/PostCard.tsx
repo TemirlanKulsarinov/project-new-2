@@ -7,13 +7,15 @@ import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import LikeButton from "@/components/LikeButton";
 import BookmarkButton from "@/components/BookmarkButton";
+import RepostButton from "@/components/RepostButton";
+import PostMediaGallery from "@/components/PostMediaGallery";
 import TimeAgo from "@/components/TimeAgo";
 
 const stop = (e: React.MouseEvent) => e.stopPropagation();
 
 export default function PostCard({ post }: { post: Post }) {
   const router = useRouter();
-  const { users, currentUser, isModerator } = useContext(AppContext);
+  const { users, currentUser, isModerator, blockedUserIds, blockedByUserIds } = useContext(AppContext);
   const author = users[post.userId];
   const isAnon = post.isAnonymous;
   const isOwn = post.userId === currentUser.id;
@@ -34,6 +36,11 @@ export default function PostCard({ post }: { post: Post }) {
     }
     prevAnon.current = post.isAnonymous;
   }, [post.isAnonymous]);
+
+  if (
+    !isModerator &&
+    (blockedUserIds.includes(post.userId) || blockedByUserIds.includes(post.userId))
+  ) return null;
 
   return (
     <article
@@ -82,6 +89,8 @@ export default function PostCard({ post }: { post: Post }) {
           {post.body}
         </p>
 
+        <PostMediaGallery media={post.media} />
+
         {isAnon && (
           <div className="mt-3 max-w-xs" aria-label={`Прогресс раскрытия: ${progress}%`}>
             <div className="h-1.5 rounded-full bg-purple-100 dark:bg-purple-900/30 overflow-hidden">
@@ -109,6 +118,7 @@ export default function PostCard({ post }: { post: Post }) {
           </Link>
 
           <BookmarkButton post={post} />
+          <RepostButton post={post} />
 
           {isAnon && (
             <span className="text-xs font-semibold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 px-2.5 py-1 rounded-full border border-purple-100 dark:border-purple-800/50">

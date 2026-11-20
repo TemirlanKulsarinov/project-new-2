@@ -9,12 +9,16 @@ import { cardClass } from "@/lib/ui";
 
 // Сохранённые посты текущего аккаунта (адрес /saved)
 export default function SavedPage() {
-  const { ready, posts, savedIds, currentUser } = useContext(AppContext);
+  const { ready, posts, savedIds, currentUser, isModerator, blockedUserIds, blockedByUserIds } = useContext(AppContext);
 
   // Порядок: недавно сохранённые первыми
   const saved = savedIds
     .map((id) => posts.find((p) => p.id === id))
-    .filter((p): p is NonNullable<typeof p> => !!p);
+    .filter(
+      (post): post is NonNullable<typeof post> =>
+        !!post &&
+        (isModerator || (!blockedUserIds.includes(post.userId) && !blockedByUserIds.includes(post.userId)))
+    );
 
   return (
     <div className={cardClass}>

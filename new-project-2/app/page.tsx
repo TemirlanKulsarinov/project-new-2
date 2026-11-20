@@ -1,16 +1,17 @@
 "use client";
-import React, { useState, useContext, useEffect, useMemo } from "react";
+import React, { useState, useContext, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { AppContext, FEED_PREFS_KEY, INTRO_KEY } from "@/context/AppContext";
 import PostCard from "@/components/PostCard";
 import PostSkeleton from "@/components/PostSkeleton";
 import { cardClass } from "@/lib/ui";
 
-type Tab = "all" | "anon" | "revealed";
+type Tab = "all" | "following" | "anon" | "revealed";
 type Sort = "new" | "popular" | "discussed";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "all", label: "Все" },
+  { id: "following", label: "Подписки" },
   { id: "anon", label: "Анонимные" },
   { id: "revealed", label: "Раскрытые" },
 ];
@@ -19,13 +20,14 @@ const PAGE_SIZE = 8;
 
 // Главная страница: лента постов (адрес /)
 export default function FeedPage() {
-  const { ready, posts, users, isModerator } = useContext(AppContext);
+  const { ready, posts, users, isModerator, followingIds, blockedUserIds, blockedByUserIds } = useContext(AppContext);
 
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<Tab>("all");
   const [sort, setSort] = useState<Sort>("new");
   const [limit, setLimit] = useState(PAGE_SIZE);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   // Вкладка и сортировка запоминаются в localStorage
   useEffect(() => {
@@ -64,9 +66,16 @@ export default function FeedPage() {
   };
 
   const visiblePosts = useMemo(() => {
-    let list = posts;
-    if (tab === "anon") list = list.filter((p) => p.isAnonymous);
-    if (tab === "revealed") list = list.filter((p) => !p.isAnonymous);
+    let list = posts.filter(
+      (post) => !blockedUserIds.includes(post.userId) && !blockedByUserIds.includes(post.userId)
+    );
+    if (tab === "following") {
+      list = list.filter((p) => !p.isAnonymous && followingIds.includes(p.userId));
+    } else if (tab === "anon") {
+      list = list.filter((p) => p.isAnonymous);
+    } else if (tab === "revealed") {
+      list = list.filter((p) => !p.isAnonymous);
+    }
 
     const q = query.trim().toLowerCase();
     if (q) {
@@ -85,7 +94,25 @@ export default function FeedPage() {
     if (sort === "popular") sorted.sort((a, b) => b.likes - a.likes);
     if (sort === "discussed") sorted.sort((a, b) => b.comments.length - a.comments.length);
     return sorted;
-  }, [posts, tab, query, sort, users, isModerator]);
+  }, [posts, tab, query, sort, users, isModerator, followingIds, blockedUserIds, blockedByUserIds]);
+
+  useEffect(() => {
+    const sentinel = loadMoreRef.current;
+    if (!ready || !sentinel || limit >= visiblePosts.length) return;
+
+    let hasTriggered = false;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !hasTriggered) {
+          hasTriggered = true;
+          setLimit((current) => Math.min(current + PAGE_SIZE, visiblePosts.length));
+        }
+      },
+      { rootMargin: "600px 0px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [ready, limit, visiblePosts.length]);
 
   const resetFilters = () => {
     setQuery("");
@@ -185,22 +212,31 @@ export default function FeedPage() {
         {ready && visiblePosts.length === 0 && (
           <div className="text-center py-16 px-5">
             <p className="text-gray-500 dark:text-neutral-500 mb-4">
-              {filtered ? "Ничего не найдено. Попробуйте изменить поиск или фильтр." : "В ленте пока пусто. Опубликуйте первый пост."}
+              {tab === "following" && !query
+                ? followingIds.length === 0
+                  ? "Вы пока ни на кого не подписаны. Найдите интересных авторов и настройте свою ленту."
+                  : "У авторов, на которых вы подписаны, пока нет раскрытых постов."
+                : filtered
+                  ? "Ничего не найдено. Попробуйте изменить поиск или фильтр."
+                  : "В ленте пока пусто. Опубликуйте первый пост."}
             </p>
-            {filtered && (
+            {tab === "following" && !query && followingIds.length === 0 ? (
+              <Link href="/following" className="inline-block text-sm font-bold px-5 py-2 rounded-full bg-black dark:bg-white text-white dark:text-black">
+                Найти авторов
+              </Link>
+            ) : filtered ? (
               <button onClick={resetFilters} className="text-sm font-bold px-5 py-2 rounded-full border border-gray-300 dark:border-neutral-700 text-black dark:text-white hover:bg-gray-50 dark:hover:bg-neutral-900">
                 Сбросить фильтры
               </button>
-            )}
+            ) : null}
           </div>
         )}
         {ready && visiblePosts.length > limit && (
-          <button
-            onClick={() => setLimit((l) => l + PAGE_SIZE)}
-            className="py-4 text-sm font-bold text-purple-600 dark:text-purple-400 hover:bg-gray-50 dark:hover:bg-neutral-900/50 transition-colors"
-          >
-            Показать ещё ({visiblePosts.length - limit})
-          </button>
+          <div ref={loadMoreRef} role="status" aria-label="Загрузка следующих публикаций" className="flex justify-center gap-1 py-5">
+            <span className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:-0.2s]" />
+            <span className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:-0.1s]" />
+            <span className="h-2 w-2 animate-bounce rounded-full bg-purple-500" />
+          </div>
         )}
       </div>
       <div className="h-8 bg-gray-50 dark:bg-neutral-900 flex justify-center items-center">

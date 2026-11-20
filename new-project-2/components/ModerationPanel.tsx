@@ -1,7 +1,7 @@
 "use client";
 import React, { useContext } from "react";
 import Link from "next/link";
-import { AppContext, Report } from "@/context/AppContext";
+import { AccountReport, AppContext, Report } from "@/context/AppContext";
 import PostCard from "@/components/PostCard";
 import BackBar from "@/components/BackBar";
 import TimeAgo from "@/components/TimeAgo";
@@ -15,8 +15,14 @@ function reasonsSummary(reports: Report[]) {
   return [...counts.entries()].map(([reason, n]) => (n > 1 ? `${reason} ×${n}` : reason)).join(", ");
 }
 
+function accountReasonsSummary(reports: AccountReport[]) {
+  const counts = new Map<string, number>();
+  reports.forEach((report) => counts.set(report.reason, (counts.get(report.reason) ?? 0) + 1));
+  return [...counts.entries()].map(([reason, count]) => (count > 1 ? `${reason} ×${count}` : reason)).join(", ");
+}
+
 export default function ModerationPanel() {
-  const { ready, posts, users, isModerator, deletePost, deleteComment, dismissReports, dismissCommentReports } =
+  const { ready, posts, users, accountReports, isModerator, deletePost, deleteComment, dismissReports, dismissCommentReports, dismissAccountReports } =
     useContext(AppContext);
 
   if (!ready) {
@@ -39,6 +45,12 @@ export default function ModerationPanel() {
   const reportedComments = posts
     .flatMap((p) => p.comments.filter((c) => c.reports.length > 0).map((c) => ({ post: p, comment: c })))
     .sort((a, b) => b.comment.reports.length - a.comment.reports.length);
+  const reportedAccounts = [...new Set(accountReports.map((report) => report.targetUserId))]
+    .map((userId) => ({
+      userId,
+      reports: accountReports.filter((report) => report.targetUserId === userId),
+    }))
+    .sort((a, b) => b.reports.length - a.reports.length);
   const anonymous = posts.filter((p) => p.isAnonymous);
 
   const stats = [
@@ -46,9 +58,12 @@ export default function ModerationPanel() {
     { label: "Скрытых авторов", value: anonymous.length },
     { label: "Жалоб на посты", value: reportedPosts.length },
     { label: "Жалоб на комментарии", value: reportedComments.length },
+    { label: "Жалоб на профили", value: accountReports.length },
   ];
 
   const names = (reports: Report[]) => reports.map((r) => `@${users[r.userId]?.username ?? "?"}`).join(", ");
+  const accountReportNames = (reports: AccountReport[]) =>
+    reports.map((report) => `@${users[report.reporterId]?.username ?? "?"}`).join(", ");
 
   return (
     <div className={cardClass}>
@@ -59,7 +74,7 @@ export default function ModerationPanel() {
         <p className="text-sm text-gray-500 dark:text-neutral-400 mb-4">
           Здесь видны жалобы пользователей и настоящие авторы анонимных постов. Эти данные недоступны остальным.
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {stats.map((s) => (
             <div key={s.label} className="bg-gray-50 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-2xl p-4 text-center">
               <div className="text-2xl font-black text-black dark:text-white">{s.value}</div>
@@ -139,6 +154,38 @@ export default function ModerationPanel() {
                   className="text-sm font-bold px-4 py-1.5 rounded-full bg-red-500 text-white hover:bg-red-600"
                 >
                   Удалить
+                </button>
+              </div>
+            </div>
+          );
+        })
+      )}
+
+      {/* Жалобы на профили */}
+      <h2 className="text-lg font-bold p-5 border-b border-gray-200 dark:border-neutral-800 text-black dark:text-white">
+        Жалобы на профили
+      </h2>
+      {reportedAccounts.length === 0 ? (
+        <p className="text-center text-gray-500 dark:text-neutral-500 py-10 text-sm">Жалоб на профили нет.</p>
+      ) : (
+        reportedAccounts.map(({ userId, reports }) => {
+          const user = users[userId];
+          if (!user) return null;
+          return (
+            <div key={userId} className="p-5 border-b border-gray-200 dark:border-neutral-800">
+              <Link href={`/u/${user.username}`} className="font-bold text-black dark:text-white hover:underline">
+                @{user.username}
+              </Link>
+              <p className="mt-2 text-sm text-gray-600 dark:text-neutral-400">
+                {reports.length} {plural(reports.length, ["жалоба", "жалобы", "жалоб"])}: {accountReasonsSummary(reports)}
+              </p>
+              <p className="text-xs text-gray-400 dark:text-neutral-500 mt-0.5">От {accountReportNames(reports)}</p>
+              <div className="mt-3 flex justify-end">
+                <button
+                  onClick={() => dismissAccountReports(userId)}
+                  className="text-sm font-semibold px-4 py-1.5 rounded-full border border-gray-300 dark:border-neutral-700 text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-neutral-800"
+                >
+                  Закрыть жалобы
                 </button>
               </div>
             </div>

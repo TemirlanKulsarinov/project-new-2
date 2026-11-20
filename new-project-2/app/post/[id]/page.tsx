@@ -8,6 +8,8 @@ import VerifiedBadge from "@/components/VerifiedBadge";
 import ModeratorBadge from "@/components/ModeratorBadge";
 import LikeButton from "@/components/LikeButton";
 import BookmarkButton from "@/components/BookmarkButton";
+import RepostButton from "@/components/RepostButton";
+import PostMediaGallery from "@/components/PostMediaGallery";
 import TimeAgo from "@/components/TimeAgo";
 import BackBar from "@/components/BackBar";
 import ReportDialog from "@/components/ReportDialog";
@@ -23,7 +25,7 @@ export default function PostPage() {
   const router = useRouter();
   const {
     ready, posts, users, currentUser, isModerator, deletePost, addComment, deleteComment,
-    reportPost, reportComment, pushToast,
+    reportPost, reportComment, pushToast, blockedUserIds, blockedByUserIds,
   } = useContext(AppContext);
 
   const [commentText, setCommentText] = useState("");
@@ -54,6 +56,22 @@ export default function PostPage() {
   }
 
   const author = users[post.userId];
+  if (!isModerator && (blockedUserIds.includes(post.userId) || blockedByUserIds.includes(post.userId))) {
+    return (
+      <div className={`${cardClass} p-10 text-center`}>
+        <h1 className="mb-2 text-xl font-black text-black dark:text-white">Публикация недоступна</h1>
+        <p className="mb-6 text-sm text-gray-500 dark:text-neutral-400">Автор публикации заблокирован или ограничил вам доступ.</p>
+        <Link href="/" className="inline-block rounded-full bg-black px-6 py-2 text-sm font-bold text-white dark:bg-white dark:text-black">
+          В ленту
+        </Link>
+      </div>
+    );
+  }
+  const visibleComments = post.comments.filter(
+    (comment) =>
+      isModerator ||
+      (!blockedUserIds.includes(comment.userId) && !blockedByUserIds.includes(comment.userId))
+  );
   const isOwn = post.userId === currentUser.id;
   const isAnon = post.isAnonymous;
   const canDelete = isOwn || isModerator;
@@ -112,6 +130,7 @@ export default function PostPage() {
 
         <h1 className="text-xl font-bold text-black dark:text-white mb-1 break-words">{post.title}</h1>
         <p className="text-[15px] text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap break-words">{post.body}</p>
+        <PostMediaGallery media={post.media} />
 
         {isAnon && (
           <div className="mt-4">
@@ -137,6 +156,7 @@ export default function PostPage() {
         <div className="mt-4 flex items-center gap-4 flex-wrap">
           <LikeButton post={post} />
           <BookmarkButton post={post} />
+          <RepostButton post={post} />
           <button
             onClick={share}
             aria-label="Скопировать ссылку"
@@ -149,7 +169,7 @@ export default function PostPage() {
             </svg>
           </button>
           <span className="text-sm text-gray-500 dark:text-neutral-400">
-            {post.comments.length} {plural(post.comments.length, ["комментарий", "комментария", "комментариев"])}
+            {visibleComments.length} {plural(visibleComments.length, ["комментарий", "комментария", "комментариев"])}
           </span>
 
           <div className="ml-auto flex items-center gap-1 flex-wrap justify-end">
@@ -185,10 +205,10 @@ export default function PostPage() {
       {/* Комментарии */}
       <h2 className="px-5 pt-4 text-lg font-bold text-black dark:text-white">Комментарии</h2>
       <div className="py-2">
-        {post.comments.length === 0 && (
+        {visibleComments.length === 0 && (
           <p className="text-center text-sm text-gray-500 dark:text-neutral-500 py-8">Комментариев пока нет. Напишите первым.</p>
         )}
-        {post.comments.map((c) => {
+        {visibleComments.map((c) => {
           const cu = users[c.userId];
           const canRemove = c.userId === currentUser.id || isModerator || isOwn;
           const canReport = c.userId !== currentUser.id;
