@@ -1,11 +1,13 @@
 "use client";
 import React, { useCallback, useContext, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppContext, AppNotification } from "@/context/AppContext";
 import TimeAgo from "@/components/TimeAgo";
 import { useDismiss } from "@/lib/useModal";
 
 export default function NotificationsBell() {
-  const { notifications, unreadCount, users, posts, openPost, markNotificationsRead } = useContext(AppContext);
+  const router = useRouter();
+  const { notifications, unreadCount, users, posts, markNotificationsRead } = useContext(AppContext);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
@@ -17,7 +19,8 @@ export default function NotificationsBell() {
     const from = n.fromUserId ? users[n.fromUserId]?.username : undefined;
     if (n.type === "reveal") return `Ваш пост ${title} раскрыт: он набрал нужное число лайков.`;
     if (n.type === "comment") return `@${from ?? "кто-то"} оставил комментарий к вашему посту ${title}.`;
-    return `Жалоба на пост ${title}${from ? ` от @${from}` : ""}.`;
+    const what = n.commentId ? "комментарий в посте" : "пост";
+    return `Жалоба на ${what} ${title}${from ? ` от @${from}` : ""}.`;
   };
 
   const dot: Record<AppNotification["type"], string> = {
@@ -67,7 +70,7 @@ export default function NotificationsBell() {
                 <button
                   onClick={() => {
                     markNotificationsRead(n.id);
-                    openPost(n.postId);
+                    router.push(`/post/${n.postId}`);
                     setOpen(false);
                   }}
                   className={`w-full text-left px-4 py-3 flex gap-3 items-start hover:bg-gray-50 dark:hover:bg-neutral-800 transition ${n.read ? "" : "bg-purple-50/60 dark:bg-purple-900/10"}`}

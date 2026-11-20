@@ -1,36 +1,63 @@
 "use client";
 import React, { useCallback, useContext, useRef, useState } from "react";
-import { AppContext } from "@/context/AppContext";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { AppContext, FEED_PREFS_KEY } from "@/context/AppContext";
 import Avatar from "@/components/Avatar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import ModeratorBadge from "@/components/ModeratorBadge";
 import NotificationsBell from "@/components/NotificationsBell";
 import { useDismiss } from "@/lib/useModal";
 
+const iconBtn =
+  "w-10 h-10 flex items-center justify-center rounded-full text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-neutral-800 transition";
+
 export default function Header() {
   const {
-    ready, users, posts, currentUser, isModerator, switchAccount, theme, toggleTheme,
-    openProfile, openModeration, setRegisterOpen, resetData,
+    ready, users, posts, currentUser, isModerator, switchAccount, theme, toggleTheme, resetData,
   } = useContext(AppContext);
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
   useDismiss(open, close, menuRef);
 
   const accounts = Object.values(users);
-  const pendingReports = posts.filter((p) => p.reports.length > 0).length;
+  const pendingReports =
+    posts.filter((p) => p.reports.length > 0).length +
+    posts.reduce((sum, p) => sum + p.comments.filter((c) => c.reports.length > 0).length, 0);
+
+  // Клик по логотипу полностью перезагружает страницу: лента обновляется, фильтры сбрасываются
+  const onLogoClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    try {
+      localStorage.removeItem(FEED_PREFS_KEY);
+    } catch {}
+    if (pathname === "/") window.location.reload();
+    else window.location.assign("/");
+  };
 
   return (
     <header className="bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-40 border-b border-gray-200 dark:border-neutral-800 transition-colors">
-      <div className="max-w-2xl mx-auto px-4 h-16 flex justify-between items-center">
-        <button
-          onClick={() => openProfile(null)}
-          className="text-xl font-bold tracking-tight text-black dark:text-white hover:opacity-70 transition"
+      <div className="h-16 px-4 sm:px-6 flex justify-between items-center gap-3">
+        {/* Логотип в левом углу */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+        <a
+          href="/"
+          onClick={onLogoClick}
+          aria-label="SecretSpace: обновить ленту"
+          className="flex items-center gap-2 text-xl font-bold tracking-tight text-black dark:text-white hover:opacity-70 transition flex-shrink-0"
         >
-          SecretSpace
-        </button>
+          <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 via-fuchsia-500 to-orange-500 flex items-center justify-center" aria-hidden>
+            <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="9" r="3.6" />
+              <path d="M7 19l1.7-5h6.6L17 19z" />
+            </svg>
+          </span>
+          <span className="hidden sm:inline">SecretSpace</span>
+        </a>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           {/* Переключатель темы */}
           <button
             onClick={toggleTheme}
@@ -74,21 +101,37 @@ export default function Header() {
             <div className="w-28 h-10 rounded-full bg-gray-100 dark:bg-neutral-800 animate-pulse" />
           ) : (
             <>
+              <Link href="/new" aria-label="Создать пост" title="Создать пост" className={iconBtn}>
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </Link>
+              <Link
+                href="/saved"
+                aria-label="Сохранённое"
+                title="Сохранённое"
+                className={`${iconBtn} ${pathname === "/saved" ? "text-amber-500 dark:text-amber-400" : ""}`}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill={pathname === "/saved" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
+                </svg>
+              </Link>
               <NotificationsBell />
 
-              <div className="relative" ref={menuRef}>
+              <div className="relative ml-1" ref={menuRef}>
                 <button
                   onClick={() => setOpen((o) => !o)}
                   aria-haspopup="menu"
                   aria-expanded={open}
-                  className="flex items-center gap-2 p-1 pr-3 rounded-full border border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-900 hover:bg-gray-100 dark:hover:bg-neutral-800 transition"
+                  aria-label="Меню аккаунта"
+                  className="flex items-center gap-2 p-1 sm:pr-3 rounded-full border border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-900 hover:bg-gray-100 dark:hover:bg-neutral-800 transition"
                 >
                   <Avatar src={currentUser.image} sizeClass="w-8 h-8" />
-                  <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 max-w-[90px] truncate">
+                  <span className="hidden sm:inline text-sm font-semibold text-gray-900 dark:text-gray-100 max-w-[90px] truncate">
                     {currentUser.firstName}
                   </span>
                   <svg
-                    className={`w-4 h-4 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`}
+                    className={`hidden sm:block w-4 h-4 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`}
                     viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
                   >
                     <path d="M6 9l6 6 6-6" />
@@ -113,24 +156,33 @@ export default function Header() {
                       </div>
                     </div>
 
-                    <button
-                      role="menuitem"
-                      onClick={() => { openProfile(currentUser.id); close(); }}
-                      className="w-full text-left px-4 py-3 text-sm font-semibold text-black dark:text-white hover:bg-gray-50 dark:hover:bg-neutral-800 transition"
-                    >
-                      Открыть мой профиль
-                    </button>
-                    {isModerator && (
-                      <button
+                    {[
+                      { href: `/u/${currentUser.username}`, label: "Мой профиль" },
+                      { href: "/saved", label: "Сохранённое" },
+                      { href: "/settings", label: "Настройки профиля" },
+                    ].map((item) => (
+                      <Link
+                        key={item.href}
                         role="menuitem"
-                        onClick={() => { openModeration(); close(); }}
-                        className="w-full text-left px-4 py-3 text-sm font-semibold text-black dark:text-white hover:bg-gray-50 dark:hover:bg-neutral-800 transition flex items-center justify-between border-t border-gray-100 dark:border-neutral-800"
+                        href={item.href}
+                        onClick={close}
+                        className="block px-4 py-3 text-sm font-semibold text-black dark:text-white hover:bg-gray-50 dark:hover:bg-neutral-800 transition"
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                    {isModerator && (
+                      <Link
+                        role="menuitem"
+                        href="/moderation"
+                        onClick={close}
+                        className="px-4 py-3 text-sm font-semibold text-black dark:text-white hover:bg-gray-50 dark:hover:bg-neutral-800 transition flex items-center justify-between border-t border-gray-100 dark:border-neutral-800"
                       >
                         Панель модерации
                         {pendingReports > 0 && (
                           <span className="text-xs font-bold bg-red-500 text-white rounded-full px-2 py-0.5">{pendingReports}</span>
                         )}
-                      </button>
+                      </Link>
                     )}
 
                     {/* Список аккаунтов */}
@@ -175,13 +227,14 @@ export default function Header() {
                     </ul>
 
                     <div className="border-t border-gray-100 dark:border-neutral-800">
-                      <button
+                      <Link
                         role="menuitem"
-                        onClick={() => { setRegisterOpen(true); close(); }}
-                        className="w-full text-left px-4 py-3 text-sm font-semibold text-sky-600 dark:text-sky-400 hover:bg-gray-50 dark:hover:bg-neutral-800 transition"
+                        href="/register"
+                        onClick={close}
+                        className="block px-4 py-3 text-sm font-semibold text-sky-600 dark:text-sky-400 hover:bg-gray-50 dark:hover:bg-neutral-800 transition"
                       >
                         + Создать аккаунт
-                      </button>
+                      </Link>
                       <button
                         role="menuitem"
                         onClick={() => {

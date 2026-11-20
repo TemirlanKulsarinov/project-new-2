@@ -3,47 +3,37 @@ import React, { useEffect, useRef } from "react";
 
 interface Ribbon {
   id: string;
-  d: string; // контур ленты
+  d: string; // контур ленты (простая плавная кривая без самопересечений)
   text: string; // повторяющаяся надпись
   speed: number; // скорость и направление движения текста при прокрутке
-  gradient?: boolean; // цветная лента (как фиолетово-оранжевая в Threads)
+  tone: "a" | "b" | "gradient"; // оттенок ленты
 }
 
-// Повторов должно хватать, чтобы текст покрывал всю длину ленты
-const REPEATS = 22;
+// Повторов с запасом хватает, чтобы текст покрывал всю длину ленты
+const REPEATS = 9;
 const RIBBON_WIDTH = 84;
+const HALO_WIDTH = 116; // светлая обводка: чётко отделяет верхнюю ленту от нижней
 // Чем меньше число, тем плавнее и «тягучее» движение (от 0.03 до 0.2)
 const SMOOTHING = 0.06;
 
+// Порядок в массиве = порядок наложения: каждая следующая лента лежит поверх предыдущих.
+// Надпись принадлежит своей ленте, поэтому нижние ленты перекрываются верхними вместе с текстом.
 const RIBBONS: Ribbon[] = [
-  {
-    id: "r1",
-    d: "M -120 120 C 300 -80, 700 380, 420 420 C 140 460, 260 120, 620 160 C 980 200, 1100 640, 1560 520",
-    text: "SECRETSPACE",
-    speed: 0.35,
-  },
-  {
-    id: "r2",
-    d: "M 1560 40 C 1100 -80, 900 360, 1180 400 C 1460 440, 1260 780, 900 740 C 540 700, 460 980, -120 840",
-    text: "KEEP IN SECRET",
-    speed: -0.3,
-  },
-  {
-    id: "r3",
-    d: "M 200 -100 C 80 300, 560 300, 360 620 C 200 880, -100 700, 120 1000",
-    text: "WHO ARE YOU?",
-    speed: 0.25,
-  },
-  {
-    id: "r4",
-    d: "M -120 560 C 300 800, 560 280, 880 460 C 1200 640, 1000 960, 700 880 C 400 800, 760 330, 1560 800",
-    text: "REVEAL YOURSELF",
-    speed: -0.4,
-    gradient: true,
-  },
+  { id: "r1", d: "M -200 780 C 150 980, 430 600, 770 620 S 1280 860, 1640 600", text: "SECRETSPACE", speed: 0.35, tone: "a" },
+  { id: "r2", d: "M -200 90 C 280 -140, 640 300, 960 170 S 1380 -60, 1640 120", text: "KEEP IN SECRET", speed: -0.3, tone: "b" },
+  { id: "r3", d: "M 300 -200 C 140 220, 560 360, 440 700 S 320 1000, 560 1100", text: "WHO ARE YOU?", speed: 0.25, tone: "a" },
+  { id: "r4", d: "M 1220 -200 C 1420 220, 1020 440, 1140 760 S 1320 1000, 1120 1100", text: "NO ONE KNOWS", speed: -0.28, tone: "b" },
+  { id: "r5", d: "M -200 430 C 220 560, 560 240, 900 300 S 1320 520, 1640 760", text: "DON'T TELL ANYONE", speed: 0.32, tone: "a" },
+  { id: "r6", d: "M -200 540 C 260 320, 560 860, 920 640 S 1320 240, 1640 380", text: "REVEAL YOURSELF", speed: -0.4, tone: "gradient" },
 ];
 
 const unit = (text: string) => `${text}  •  `;
+
+const toneClass: Record<Ribbon["tone"], string> = {
+  a: "stroke-neutral-950 dark:stroke-neutral-800",
+  b: "stroke-zinc-900 dark:stroke-neutral-700",
+  gradient: "",
+};
 
 function Background() {
   const textRefs = useRef<(SVGTextElement | null)[]>([]);
@@ -62,7 +52,7 @@ function Background() {
       });
     };
 
-    // Текст не прыгает за скроллом, а догоняет его с инерцией: движение получается плавным
+    // Текст догоняет прокрутку с инерцией: движение получается плавным
     let current = reduceMotion ? 0 : window.scrollY;
     let target = current;
 
@@ -120,49 +110,45 @@ function Background() {
           <stop offset="0.5" stopColor="#d946ef" />
           <stop offset="1" stopColor="#f97316" />
         </linearGradient>
-        {RIBBONS.map((r) => (
-          <path key={r.id} id={r.id} d={r.d} />
-        ))}
       </defs>
 
-      {/* Тело лент */}
-      <g fill="none" strokeWidth={RIBBON_WIDTH} strokeLinecap="round">
-        {RIBBONS.map((r) =>
-          r.gradient ? (
-            <path key={r.id} d={r.d} stroke="url(#ribbon-gradient)" />
-          ) : (
-            <path key={r.id} d={r.d} className="stroke-neutral-950 dark:stroke-neutral-800" />
-          )
-        )}
-      </g>
-
-      {/* Надписи вдоль лент */}
+      {/* Каждая лента рисуется целиком (обводка, тело, текст), затем следующая поверх неё */}
       {RIBBONS.map((r, i) => (
-        <text
-          key={r.id}
-          ref={(el) => {
-            textRefs.current[i] = el;
-          }}
-          dy="0.35em"
-          className="fill-white"
-          style={{
-            fontSize: 44,
-            fontWeight: 900,
-            letterSpacing: 2,
-            whiteSpace: "pre",
-            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-          }}
-        >
-          <textPath
+        <g key={r.id} fill="none" strokeLinecap="butt">
+          <path d={r.d} strokeWidth={HALO_WIDTH} className="stroke-gray-100 dark:stroke-neutral-950" />
+          <path
+            id={r.id}
+            d={r.d}
+            strokeWidth={RIBBON_WIDTH}
+            className={toneClass[r.tone]}
+            stroke={r.tone === "gradient" ? "url(#ribbon-gradient)" : undefined}
+          />
+          <text
             ref={(el) => {
-              pathRefs.current[i] = el;
+              textRefs.current[i] = el;
             }}
-            href={`#${r.id}`}
-            startOffset={0}
+            dy="0.35em"
+            className="fill-white"
+            stroke="none"
+            style={{
+              fontSize: 40,
+              fontWeight: 900,
+              letterSpacing: 3,
+              whiteSpace: "pre",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+            }}
           >
-            {unit(r.text).repeat(REPEATS)}
-          </textPath>
-        </text>
+            <textPath
+              ref={(el) => {
+                pathRefs.current[i] = el;
+              }}
+              href={`#${r.id}`}
+              startOffset={0}
+            >
+              {unit(r.text).repeat(REPEATS)}
+            </textPath>
+          </text>
+        </g>
       ))}
     </svg>
   );

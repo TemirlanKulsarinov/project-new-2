@@ -1,10 +1,9 @@
 import "./globals.css";
-import React from "react";
+import React, { Suspense } from "react";
 import type { Viewport } from "next";
 import { AppProvider } from "@/context/AppContext";
 import Header from "@/components/Header";
-import PostModal from "@/components/PostModal";
-import RegisterModal from "@/components/RegisterModal";
+import Background from "@/components/Background";
 import Toasts from "@/components/Toasts";
 
 export const metadata = {
@@ -44,15 +43,19 @@ export default function RootLayout({
       </head>
       <body>
         <AppProvider>
-          <Header />
-          <main className="max-w-2xl mx-auto min-h-screen pb-10">{children}</main>
+          {/* Фон лежит в layout, поэтому не перезапускается при переходах между страницами */}
+          <Background />
+          <Suspense fallback={<div className="h-16" aria-hidden />}>
+            <Header />
+          </Suspense>
+          <main className="relative z-10 max-w-2xl mx-auto min-h-screen pt-6 pb-10">
+            <Suspense fallback={<div className="min-h-[60vh]" aria-hidden />}>{children}</Suspense>
+          </main>
           <footer className="relative z-10 max-w-2xl mx-auto px-4 pb-10 text-center text-xs text-gray-500 dark:text-neutral-500">
             <span className="bg-white/80 dark:bg-black/70 backdrop-blur px-3 py-1.5 rounded-full inline-block">
               SecretSpace · демо-проект. Данные хранятся только в вашем браузере.
             </span>
           </footer>
-          <PostModal />
-          <RegisterModal />
           <Toasts />
         </AppProvider>
       </body>

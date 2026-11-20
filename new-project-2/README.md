@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SecretSpace
 
-## Getting Started
+Минималистичная социальная сеть с механикой анонимности (Next.js + Tailwind CSS).
 
-First, run the development server:
+**Главная идея (Reveal Posts).** Пользователи делятся мыслями инкогнито и сами назначают «цену» раскрытия
+в лайках. Личность автора, его аватар и профиль скрыты, пока пост не наберёт нужное число лайков.
+Опубликованный пост нельзя редактировать, его можно только удалить.
+
+## Запуск
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Откройте http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Страницы (у каждой своя ссылка)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Адрес | Что это |
+|---|---|
+| `/` | Лента: поиск, вкладки, сортировка |
+| `/new` | Создание поста (черновик сохраняется) |
+| `/post/123` | Страница поста: лайк, сохранение, ссылка, комментарии, жалобы |
+| `/u/username` | Профиль пользователя |
+| `/saved` | Сохранённые посты текущего аккаунта |
+| `/settings` | Настройки профиля |
+| `/register` | Создание аккаунта |
+| `/moderation` | Панель модерации (только для модераторов) |
 
-## Learn More
+Клик по логотипу в левом углу перезагружает страницу и обновляет ленту.
 
-To learn more about Next.js, take a look at the following resources:
+## Возможности
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Анонимные посты с порогом раскрытия, полоска прогресса, свечение при раскрытии автора
+- Лайки в стиле Instagram (можно снять, свои посты лайкать нельзя)
+- Комментарии; жалобы на посты и комментарии с выбором причины
+- Избранное: у каждого аккаунта свой список сохранённых постов
+- Уведомления: раскрытие поста, новые комментарии, жалобы (для модераторов)
+- 10 готовых аккаунтов и создание своего; переключение в меню аккаунта
+- Модератор (`temirlan`): видит авторов анонимных постов, удаляет любые посты и комментарии,
+  разбирает жалобы в панели модерации
+- Светлая и тёмная темы, живой фон из наложенных лент с текстом, который движется при прокрутке
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Что сохраняется в localStorage
 
-## Deploy on Vercel
+| Ключ | Содержимое |
+|---|---|
+| `secretspace-v4` | посты, комментарии, лайки, жалобы, аккаунты, текущий аккаунт, уведомления, избранное |
+| `secretspace-theme` | тема |
+| `secretspace-feed` | вкладка и сортировка ленты |
+| `secretspace-draft` | черновик нового поста |
+| `secretspace-intro` | скрыта ли подсказка «Как работает» |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Данные прежней версии (`secretspace-v3`) подхватываются автоматически.
+Сбросить всё можно в меню аккаунта: «Сбросить демо-данные».
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Структура
+
+```
+app/          страницы (page.tsx в каждой папке = отдельный адрес), layout, стили, иконка
+components/   Header, PostCard, ReportDialog, ModerationPanel, Background и др.
+context/      AppContext: всё состояние приложения и действия
+lib/          форматирование, хуки модалок, общие классы оформления
+```
+
+## Важно
+
+Это демо без сервера: данные живут только в браузере, поэтому анонимность и роли условные.
+В реальном проекте раскрытие автора и права модератора нужно проверять на сервере.
